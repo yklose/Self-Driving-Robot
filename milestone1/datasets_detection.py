@@ -11,8 +11,8 @@ from openpifpaf.datasets import collate_images_targets_meta
 
 import numpy as np
 
-ANNOTATIONS_TRAIN = 'data-mscoco/annotations/person_keypoints_train2017.json'
-ANNOTATIONS_VAL = 'data-mscoco/annotations/person_keypoints_val2017.json'
+ANNOTATIONS_TRAIN = 'data-mscoco/annotations/instances_train2017.json'
+ANNOTATIONS_VAL = 'data-mscoco/annotations/instances_val2017.json'
 IMAGE_DIR_TRAIN = 'data-mscoco/images/train2017/'
 IMAGE_DIR_VAL = 'data-mscoco/images/val2017/'
 
@@ -115,7 +115,10 @@ class CocoKeypoints(torch.utils.data.Dataset):
                     center_x = (x2 + x1)/2
                     center_y = (y2 + y1)/2
                     classobject = ann['category_id']
-                    keypoint_array = np.zeros(80*3)
+                    keypoint_array = np.zeros(91*3)
+                    print(" ")
+                    print(image_id)
+                    print(classobject)
                     keypoint_array[classobject*3] = center_x
                     keypoint_array[classobject*3+1] = center_y
                     keypoint_array[classobject*3+2] = 2 # 2 means visible keypoint
