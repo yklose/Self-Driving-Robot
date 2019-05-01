@@ -39,6 +39,7 @@ class CocoKeypoints(torch.utils.data.Dataset):
         # get all images - not filter
         self.ids = self.coco.getImgIds()
         self.filter_for_box_annotations()
+       
         
         print('Images: {}'.format(len(self.ids)))
 
@@ -48,12 +49,21 @@ class CocoKeypoints(torch.utils.data.Dataset):
 
         self.log = logging.getLogger(self.__class__.__name__)
         
+        
+        
     def __getitem__(self, index):
         image_id = self.ids[index]
         ann_ids = self.coco.getAnnIds(imgIds=image_id)
         anns = self.coco.loadAnns(ann_ids)
         anns = copy.deepcopy(anns)
-
+        #print("old anns")
+        #print(anns)
+        #add keypoints for one image!
+        anns = self.add_keypoints(anns)
+        #print("new anns")
+        #print(anns)
+        #print("next image")
+        
         image_info = self.coco.loadImgs(image_id)[0]
         self.log.debug(image_info)
         with open(os.path.join(self.root, image_info['file_name']), 'rb') as f:
@@ -72,6 +82,9 @@ class CocoKeypoints(torch.utils.data.Dataset):
 
         # preprocess image and annotations
         image, anns, preprocess_meta = self.preprocess(image, anns)
+        #print("anns before: ")
+        #print(anns)
+        #anns = create_keypoint_array(image_id)
         meta.update(preprocess_meta)
 
         # transform image
@@ -96,41 +109,64 @@ class CocoKeypoints(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.ids)
     
+    
+    def add_keypoints(self, anns):
+        keypoint_array = np.zeros(91*3) #[0]*(91*3)
+
+        # add num_keypoints!
+        counter = 0
+        
+        for ann in anns:
+            # bounding box: format is [top left x position, top left y position, width, height]
+            bb = ann['bbox']
+            # do not create area, but keypoints for bounding box
+            x1, x2, y1, y2 = [bb[0], bb[0]+bb[2], bb[1], bb[1]+bb[3]]
+            center_x = (x2 + x1)/2
+            center_y = (y2 + y1)/2
+            classobject = ann['category_id']
+            #print(classobject)
+
+            #print(classobject)
+            keypoint_array[classobject*3] = center_x
+            keypoint_array[classobject*3+1] = center_y
+            keypoint_array[classobject*3+2] = 2 # 2 means visible keypoint
+            # create 1D array --> 80x3 (x,y,visible=2)
+            # create array that can have multiple entries
+            
+           
+            ann['keypoints'] = keypoint_array
+            ann['num_keypoints'] = counter
+           
+           
+            counter += 1
+            
+        
+        return anns
+    
+        
     def filter_for_box_annotations(self):
         
         # single keypoint per box in the center!
-        
-        print('filter for box annotations ...')
-        def has_box_annotation(image_id):
+        def has_keypoint_annotation(image_id):
+    
             ann_ids = self.coco.getAnnIds(imgIds=image_id)
             anns = self.coco.loadAnns(ann_ids)
+
+            
+            
+            keypoint_array = np.zeros(91*3)
             for ann in anns:
                 if 'bbox' not in ann:
                     continue
                 # create bounding box
                 if any(v > 0.0 for v in ann['bbox'][2::3]):
-                    bb = ann['bbox']
-                    # dont create area, but keypoints for bounding box
-                    x1, x2, y1, y2 = [bb[0], bb[0]+bb[2], bb[1], bb[1]+bb[3]]
-                    center_x = (x2 + x1)/2
-                    center_y = (y2 + y1)/2
-                    classobject = ann['category_id']
-                    keypoint_array = np.zeros(91*3)
-                    print(" ")
-                    print(image_id)
-                    print(classobject)
-                    keypoint_array[classobject*3] = center_x
-                    keypoint_array[classobject*3+1] = center_y
-                    keypoint_array[classobject*3+2] = 2 # 2 means visible keypoint
-                    # create 1D array --> 80x3 (x,y,visible=2)
-                    # create array that can have multiple entries
-                    ann['keypoints'] = [keypoint_array]
-                    
                     return True
             return False
-
+            
+        # select the images that have a keypoint!
         self.ids = [image_id for image_id in self.ids
-                    if has_box_annotation(image_id)]
+                    if has_keypoint_annotation(image_id)]
+        
         print('... done.')
 
 ################################################################################
