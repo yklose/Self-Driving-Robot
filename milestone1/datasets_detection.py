@@ -56,14 +56,10 @@ class CocoKeypoints(torch.utils.data.Dataset):
         ann_ids = self.coco.getAnnIds(imgIds=image_id)
         anns = self.coco.loadAnns(ann_ids)
         anns = copy.deepcopy(anns)
-        #print("old anns")
-        #print(anns)
+        
         #add keypoints for one image!
         anns = self.add_keypoints(anns)
-        #print("new anns")
-        #print(anns)
-        #print("next image")
-        
+
         image_info = self.coco.loadImgs(image_id)[0]
         self.log.debug(image_info)
         with open(os.path.join(self.root, image_info['file_name']), 'rb') as f:
@@ -82,9 +78,6 @@ class CocoKeypoints(torch.utils.data.Dataset):
 
         # preprocess image and annotations
         image, anns, preprocess_meta = self.preprocess(image, anns)
-        #print("anns before: ")
-        #print(anns)
-        #anns = create_keypoint_array(image_id)
         meta.update(preprocess_meta)
 
         # transform image
@@ -124,9 +117,7 @@ class CocoKeypoints(torch.utils.data.Dataset):
             center_x = (x2 + x1)/2
             center_y = (y2 + y1)/2
             classobject = ann['category_id']
-            #print(classobject)
-
-            #print(classobject)
+   
             keypoint_array[classobject*3] = center_x
             keypoint_array[classobject*3+1] = center_y
             keypoint_array[classobject*3+2] = 2 # 2 means visible keypoint
@@ -146,15 +137,11 @@ class CocoKeypoints(torch.utils.data.Dataset):
         
     def filter_for_box_annotations(self):
         
-        # single keypoint per box in the center!
         def has_keypoint_annotation(image_id):
     
             ann_ids = self.coco.getAnnIds(imgIds=image_id)
             anns = self.coco.loadAnns(ann_ids)
 
-            
-            
-            keypoint_array = np.zeros(91*3)
             for ann in anns:
                 if 'bbox' not in ann:
                     continue
