@@ -9,6 +9,7 @@ from openpifpaf import transforms
 from openpifpaf import utils
 from openpifpaf.datasets import collate_images_targets_meta
 
+
 import numpy as np
 
 ANNOTATIONS_TRAIN = 'data-mscoco/annotations/instances_train2017.json'
@@ -31,35 +32,38 @@ IMAGE_DIR_VAL = 'data-mscoco/images/val2017/'
 ################################################################################
 class CocoKeypoints(torch.utils.data.Dataset):
     
-    def __init__(self, root, annFile, image_transform=None, target_transforms=None, preprocess=None):
+    def __init__(self, root, annFile, image_transform=None, target_transforms=None, preprocess=None, horzontalflip=None):
         from pycocotools.coco import COCO
         self.root = root
         self.coco = COCO(annFile)
         
         # get all images - not filter
+        
+        self.cat_ids = self.coco.getCatIds()
+        #print(self.cat_ids)
+        #self.compare_array = create_mapping(self.cat_ids)
         self.ids = self.coco.getImgIds()
-        self.filter_for_box_annotations()
-       
+        #self.ids = self.ids[:5]
         
         print('Images: {}'.format(len(self.ids)))
 
         self.preprocess = preprocess or transforms.Normalize()
         self.image_transform = image_transform or transforms.image_transform
         self.target_transforms = target_transforms
+        #self.horizontalflip = horzontalflip or transforms.Hflip()
 
         self.log = logging.getLogger(self.__class__.__name__)
-        
-        
-        
+            
+
     def __getitem__(self, index):
         image_id = self.ids[index]
         ann_ids = self.coco.getAnnIds(imgIds=image_id)
         anns = self.coco.loadAnns(ann_ids)
         anns = copy.deepcopy(anns)
-        
-        #add keypoints for one image!
+
         anns = self.add_keypoints(anns)
 
+        #pdb.set_trace()
         image_info = self.coco.loadImgs(image_id)[0]
         self.log.debug(image_info)
         with open(os.path.join(self.root, image_info['file_name']), 'rb') as f:
@@ -78,6 +82,11 @@ class CocoKeypoints(torch.utils.data.Dataset):
 
         # preprocess image and annotations
         image, anns, preprocess_meta = self.preprocess(image, anns)
+        #print("anns before: ")
+        #image, anns, preprocess_meta = self.horizontalflip(self.preprocess(image, anns))
+        
+        
+        #anns = create_keypoint_array(image_id)
         meta.update(preprocess_meta)
 
         # transform image
@@ -103,9 +112,17 @@ class CocoKeypoints(torch.utils.data.Dataset):
         return len(self.ids)
     
     
+    def create_mapping(self, index):
+        for i in range(len(self.cat_ids)):
+                if self.cat_ids[i] == index:
+                    return i
+        
+        return 0 
+    
     def add_keypoints(self, anns):
-        keypoint_array = np.zeros(91*3) #[0]*(91*3)
-
+        keypoint_array = np.zeros(80*3) #[0]*(91*3)
+        #loop the categories!
+        # check that batch is correcly output
         # add num_keypoints!
         counter = 0
         
@@ -116,8 +133,11 @@ class CocoKeypoints(torch.utils.data.Dataset):
             x1, x2, y1, y2 = [bb[0], bb[0]+bb[2], bb[1], bb[1]+bb[3]]
             center_x = (x2 + x1)/2
             center_y = (y2 + y1)/2
-            classobject = ann['category_id']
-   
+            temp = ann['category_id']
+            classobject = self.create_mapping(temp)
+            print(ann['image_id'])
+
+            #print(classobject)
             keypoint_array[classobject*3] = center_x
             keypoint_array[classobject*3+1] = center_y
             keypoint_array[classobject*3+2] = 2 # 2 means visible keypoint
@@ -134,27 +154,7 @@ class CocoKeypoints(torch.utils.data.Dataset):
         
         return anns
     
-        
-    def filter_for_box_annotations(self):
-        
-        def has_keypoint_annotation(image_id):
-    
-            ann_ids = self.coco.getAnnIds(imgIds=image_id)
-            anns = self.coco.loadAnns(ann_ids)
 
-            for ann in anns:
-                if 'bbox' not in ann:
-                    continue
-                # create bounding box
-                if any(v > 0.0 for v in ann['bbox'][2::3]):
-                    return True
-            return False
-            
-        # select the images that have a keypoint!
-        self.ids = [image_id for image_id in self.ids
-                    if has_keypoint_annotation(image_id)]
-        
-        print('... done.')
 
 ################################################################################
 #                              END OF YOUR CODE                                #
@@ -203,6 +203,7 @@ def train_factory(args, preprocess, target_transforms):
         preprocess=preprocess,
         image_transform=transforms.image_transform_train,
         target_transforms=target_transforms,
+        
         
     )
     val_loader = torch.utils.data.DataLoader(
