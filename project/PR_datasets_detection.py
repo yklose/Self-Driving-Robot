@@ -14,10 +14,11 @@ from skimage import measure
 from shapely.geometry import Polygon, MultiPolygon 
 
 import numpy as np
+import random
 
-ANNOTATIONS_TRAIN = 'data-mscoco/annotations/instances_val2017.json'
+ANNOTATIONS_TRAIN = 'data-mscoco/annotations/instances_train2017.json'
 ANNOTATIONS_VAL = 'data-mscoco/annotations/instances_val2017.json'
-IMAGE_DIR_TRAIN = 'data-mscoco/images/val2017/'
+IMAGE_DIR_TRAIN = 'data-mscoco/images/train2017/'
 IMAGE_DIR_VAL = 'data-mscoco/images/val2017/'
 
 ################################################################################
@@ -43,8 +44,6 @@ class CocoKeypoints(torch.utils.data.Dataset):
         # get all images - not filter
         
         self.cat_ids = self.coco.getCatIds()
-        #print(self.cat_ids)
-        #self.compare_array = create_mapping(self.cat_ids)
         self.ids = self.coco.getImgIds()
         self.filter_for_box_annotations()
         #self.ids = self.ids[:5]
@@ -54,7 +53,6 @@ class CocoKeypoints(torch.utils.data.Dataset):
         self.preprocess = preprocess or transforms.Normalize()
         self.image_transform = image_transform or transforms.image_transform
         self.target_transforms = target_transforms
-        #self.horizontalflip = horzontalflip or transforms.Hflip()
 
         self.log = logging.getLogger(self.__class__.__name__)
             
@@ -69,18 +67,21 @@ class CocoKeypoints(torch.utils.data.Dataset):
         #pdb.set_trace()
         image_info = self.coco.loadImgs(image_id)[0]
         self.log.debug(image_info)
-        anns, overlay_image = self.modify_keypoints(anns, image_info['file_name'])
+        
+        # set percentage for pasting
+        threshold = 50
+        rand_num = random.randint(0, 100)
+        if rand_num > threshold:
+            paste = True
+        else:
+            paste = False
+        anns, overlay_image = self.modify_keypoints(anns, image_info['file_name'], paste)
        
-        with open(os.path.join(self.root, image_info['file_name']), 'rb') as f:
-            image = Image.open(f).convert('RGB')
+        #with open(os.path.join(self.root, image_info['file_name']), 'rb') as f:
+        #    image = Image.open(f).convert('RGB')
 
-        #print("images: ")
-        #print(image)
-    
-        #image.save("image_before.png", format="png")
         image = overlay_image.convert('RGB')
-        #image.save("image_after.png", format="png")
-        #print(image)
+
         meta = {
             'dataset_index': index,
             'image_id': image_id,
@@ -94,17 +95,12 @@ class CocoKeypoints(torch.utils.data.Dataset):
 
         # preprocess image and annotations
         image, anns, preprocess_meta = self.preprocess(image, anns)
-        #print("anns before: ")
-        #image, anns, preprocess_meta = self.horizontalflip(self.preprocess(image, anns))
-        
-        
-        #anns = create_keypoint_array(image_id)
+
         meta.update(preprocess_meta)
 
         # transform image
         original_size = image.size
         image = self.image_transform(image)
-        #print(image.size)
         assert image.size(2) == original_size[0]
         assert image.size(1) == original_size[1]
 
@@ -124,34 +120,36 @@ class CocoKeypoints(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.ids)
     
-    
-    
-    def modify_keypoints(self, anns, filename):
+
+    def modify_keypoints(self, anns, filename, paste):
         # in the end we just want to have one keypoint
         # this keypoints is the center of our chosen tracking object
         keypoint_array = [0]*(3)
        
-        #print(anns)
-        
         ann = anns[0]                   # image ID is the same all annotations of one image
         
         background_path = IMAGE_DIR_TRAIN + str(filename)
         object_path = "test_images/model.png"
-        image, center_x, center_y, x_pos, y_pos, length, height = PR_pillow_testing.overlay(background_path, object_path)
+        image, center_x, center_y, x_pos, y_pos, length, height = PR_pillow_testing.overlay(background_path, object_path, paste)
+        
+        # set keypoint array
         keypoint_array[0] = center_x
         keypoint_array[1] = center_y
-        keypoint_array[2] = 2           # we always set the keypoint to visible 
+        if (paste):
+            keypoint_array[2] = 2       # we always set the keypoint to visible 
+        else:
+            keypoint_array[2] = 0       # if paste is not true, no image is inserted
+            
+        # extract important information out of json file
         image_id = ann['image_id']
         annotation_id = ann['id']       # take unique annotation ID (this is unique over all images?)
         is_crowd = 0                    # single object
         annotations = []
      
+        # create annotations
         annotation_object = self.create_annotation(x_pos, y_pos, length, height, image_id, annotation_id, is_crowd)
         annotation_object['keypoints'] = keypoint_array
         annotations.append(annotation_object)
-            
-        #print("new Annotations")
-        #print(annotations)
         
         return annotations, image
     
@@ -224,10 +222,16 @@ def train_factory(args, preprocess, target_transforms):
         target_transforms=target_transforms,
         
     )
-    train_loader = torch.utils.data.DataLoader(
+    
+    np.random.seed(100)
+
+    train_loader = torch.utils.data.DataLoader(torch.utils.data.Subset(train_data, np.random.choice(len(train_data),20000)), batch_size=args.batch_size, shuffle=not args.debug, pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True, collate_fn=collate_images_targets_meta)
+    
+    
+    """train_loader = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size, shuffle=not args.debug,
         pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True,
-        collate_fn=collate_images_targets_meta)
+        collate_fn=collate_images_targets_meta)"""
 
     val_data = CocoKeypoints(
         root=args.val_image_dir,
@@ -250,11 +254,15 @@ def train_factory(args, preprocess, target_transforms):
         image_transform=transforms.image_transform_train,
         target_transforms=target_transforms,
         
+        
     )
-    pre_train_loader = torch.utils.data.DataLoader(
+    
+    pre_train_loader = torch.utils.data.DataLoader(torch.utils.data.Subset(train_data, np.random.choice(len(train_data),1000)), batch_size=args.batch_size, shuffle=not args.debug, pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True, collate_fn=collate_images_targets_meta)
+    
+    """pre_train_loader = torch.utils.data.DataLoader(
         pre_train_data, batch_size=args.batch_size, shuffle=True,
         pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True,
-        collate_fn=collate_images_targets_meta)
+        collate_fn=collate_images_targets_meta)"""
     
     ################################################################################
     #                              END OF YOUR CODE                                #

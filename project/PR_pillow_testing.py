@@ -8,12 +8,13 @@ import random
 background_path = "test_images/background.jpg"
 object_path = "test_images/model.png"
 
-def overlay(background_path, object_path):
+def overlay(background_path, object_path, paste):
     
     background = Image.open(background_path).convert("RGBA")
     foreground = Image.open(object_path).convert("RGBA")
     x1, y1 = foreground.size
     x2, y2 = background.size
+
 
     # random scaling
     minimum_scaling = 0.6
@@ -27,8 +28,8 @@ def overlay(background_path, object_path):
     x1, y1 = foreground.size
 
     # set random position
-    rand_x = random.randint(0, x2-x1)
-    rand_y = random.randint(0, y2-y1)
+    rand_x = random.randint(0, abs(x2-x1))
+    rand_y = random.randint(0, abs(y2-y1))
     
     # set random blur
     minimum_blur = 0.0
@@ -36,16 +37,23 @@ def overlay(background_path, object_path):
     random_blur = random.randint(minimum_blur*100, maximum_blur*100)/100
     foreground = foreground.filter(ImageFilter.GaussianBlur(random_blur))
 
+    # affine transform!
+    
     # set random brightness
     minimum_brightness = 0.6
     maximum_brightness = 1.3
     random_brightness = random.randint(minimum_brightness*100, maximum_brightness*100)/100
     foreground = ImageEnhance.Brightness(foreground).enhance(random_brightness)
 
-    # pase foreground image on background image
-    background.paste(foreground, (rand_x, rand_y), foreground)
-    center_x = int(rand_x+x1/2)
-    center_y = int(rand_y+y1/2)
+    if (paste):
+        # pase foreground image on background image
+        background.paste(foreground, (rand_x, rand_y), foreground)
+        center_x = int(rand_x+x1/2)
+        center_y = int(rand_y+y1/2)
+    else:
+        center_x = 0
+        center_y = 0
+
     
     # save the image (for testing purpose)
     #background.save("test_image.png", format="png")

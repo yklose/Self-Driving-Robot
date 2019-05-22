@@ -192,10 +192,15 @@ def train_factory(args, preprocess, target_transforms):
         target_transforms=target_transforms,
         
     )
-    train_loader = torch.utils.data.DataLoader(
+    np.random.seed(100)
+
+    train_loader = torch.utils.data.DataLoader(torch.utils.data.Subset(train_data, np.random.choice(len(train_data),20000)), batch_size=args.batch_size, shuffle=not args.debug, pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True, collate_fn=collate_images_targets_meta)
+    
+    
+    """train_loader = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size, shuffle=not args.debug,
         pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True,
-        collate_fn=collate_images_targets_meta)
+        collate_fn=collate_images_targets_meta)"""
 
     val_data = CocoKeypoints(
         root=args.val_image_dir,
@@ -219,10 +224,13 @@ def train_factory(args, preprocess, target_transforms):
         target_transforms=target_transforms,
         
     )
-    pre_train_loader = torch.utils.data.DataLoader(
+    
+    pre_train_loader = torch.utils.data.DataLoader(torch.utils.data.Subset(train_data, np.random.choice(len(train_data),20000)), batch_size=args.batch_size, shuffle=not args.debug, pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True, collate_fn=collate_images_targets_meta)
+    
+    """pre_train_loader = torch.utils.data.DataLoader(
         pre_train_data, batch_size=args.batch_size, shuffle=True,
         pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True,
-        collate_fn=collate_images_targets_meta)
+        collate_fn=collate_images_targets_meta)"""
     
     ################################################################################
     #                              END OF YOUR CODE                                #
