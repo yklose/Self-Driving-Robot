@@ -5,11 +5,70 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 import random
 
 
-background_path = "test_images/background.jpg"
-object_path = "test_images/model.png"
 
-def overlay(background_path, object_path, paste):
+def overlay_output(background_path, paste):
+    """The function dose the following:
+        1. Rescale the generated pattern and make it suit he img.
+        2. Find a random axis to place the pattern.
+        3. Paste the pattern to the selected place.
+    Args:
+        img: an image module in PIL img = PIL.Image.open()
+        n_of_patterns: an int.
+        scale: a float, indicating possible scaling range of the pattern.
+    Return:
+        Whatever suit the training input function.
+        And a list indicating x, y, Width, Height
+    """
+    n_of_patterns = 1
+    scale = 0.3
+    imgWidth ,imgHeight = img.size
+    fitWidth = imgWidth * scale # fitWidth could be a float!
+    #Axis = []
+    for n in range(n_of_patterns):
+        random_fit_width = int(fitWidth * random.uniform(0.2,1.0))
+        pattern = generate_pattern(random_fit_width)# generate_pattern() # pattern is also a PIL.image file
+        patternWidth, patternHeight = pattern.size
+        pattern.save(os.path.join('transformed_pattern.png'))
+        position_x = random.randint(0,imgWidth - patternWidth)
+        position_y = random.randint(0,imgHeight - patternHeight)
+
+        if paste:
+            img.paste(pattern,box =(position_x,position_y),mask = pattern) 
+        # the third argument serves as a mask, making white = 0 transparent
+        # Axis.append ([position_x,position_y,position_x + patternWidth,position_y + patternHeight])
+        center_x = int(position_x + 0.5*patternWidth,position_y+0.5*patternHeight)
+
+    return img , center_x, center_y, position_x, position_y, patternWidth, patternHeight
+
+def generate_pattern(random_fit_width):
+    """The function takes random_fit_Width, which could be a float!
+    The function dose the following:
+        1. Read the pattern file (must be PNG to have transparency)
+        2. Do random transformation on it.
+        3. Return a transformed PIL.image file
+    """
+    pattern = Image.open('pattern.png').convert("RGBA")
+    patternWidth, patternHeight = pattern.size
+    patternHeight = int(random_fit_width / patternWidth * patternHeight)
+    patternWidth = random_fit_width
+    #pattern = pattern.resize((patternWidth, patternHeight))
+    #pattern.ToTensor()
+    pattern = functional.resize(pattern,(patternHeight,patternWidth))
+    transform = Compose([
+        ColorJitter(brightness= (0.5,1.1), contrast = (0.5,1),
+         saturation= (0.75,1), hue= 0.05),
+        #RandomApply((RandomResizedCrop(size = (patternWidth, patternHeight),scale = (0.75,1.0)),),p = 0.25),
+        RandomAffine(degrees=45),
+        #RandomApply((RandomRotation(degrees = 30), ), p = 0.75),
+        #RandomPerspective(distortion_scale=0.5, p=0.5,)
+    ])    
+
+    return transform(pattern)
+
+'''
+def overlay(background_path, paste):
     
+    object_path = "test_images/model.png"
     background = Image.open(background_path).convert("RGBA")
     foreground = Image.open(object_path).convert("RGBA")
     x1, y1 = foreground.size
@@ -62,4 +121,4 @@ def overlay(background_path, object_path, paste):
 
 #image, center_x, center_y, rand_x, rand_y, x1, y1 = overlay(background_path, object_path)
 #print(image)
-
+'''

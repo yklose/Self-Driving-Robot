@@ -11,15 +11,15 @@ from openpifpaf.datasets import collate_images_targets_meta
 
 import PR_pillow_testing
 from skimage import measure                        
-from shapely.geometry import Polygon, MultiPolygon 
+# from shapely.geometry import Polygon, MultiPolygon 
 
 import numpy as np
 import random
 
-ANNOTATIONS_TRAIN = 'data-mscoco/annotations/instances_train2017.json'
-ANNOTATIONS_VAL = 'data-mscoco/annotations/instances_val2017.json'
-IMAGE_DIR_TRAIN = 'data-mscoco/images/train2017/'
-IMAGE_DIR_VAL = 'data-mscoco/images/val2017/'
+ANNOTATIONS_TRAIN = '~/data-mscoco/annotations/instances_train2017.json'
+ANNOTATIONS_VAL = '~/data-mscoco/annotations/instances_val2017.json'
+IMAGE_DIR_TRAIN = '~/data-mscoco/images/train2017/'
+IMAGE_DIR_VAL = '~/data-mscoco/images/val2017/'
 
 class CocoKeypoints(torch.utils.data.Dataset):
     """CocoKeypoints is a subclass of torch.utils.data.Dataset
@@ -50,7 +50,7 @@ class CocoKeypoints(torch.utils.data.Dataset):
         
         self.cat_ids = self.coco.getCatIds()
         self.ids = self.coco.getImgIds()
-        self.filter_for_box_annotations()
+        #self.filter_for_box_annotations()
         #self.ids = self.ids[:5]
         
         print('Images: {}'.format(len(self.ids)))
@@ -76,6 +76,8 @@ class CocoKeypoints(torch.utils.data.Dataset):
             paste = True
         else:
             paste = False
+
+        anns = 1
         anns, overlay_image = self.modify_keypoints(anns, image_info['file_name'], paste)
         
         image = overlay_image.convert('RGB')
@@ -98,9 +100,9 @@ class CocoKeypoints(torch.utils.data.Dataset):
        
         #ann = anns[0]                   # image ID is the same all annotations of one image
         
-        #background_path = IMAGE_DIR_TRAIN + str(filename)
-        object_path = "test_images/model.png"
-        image, center_x, center_y, x_pos, y_pos, length, height = PR_pillow_testing.overlay(background_path, object_path, paste)
+        background_path = IMAGE_DIR_TRAIN + str(filename)
+        # object_path = "test_images/model.png"
+        image, center_x, center_y, x_pos, y_pos, length, height = PR_pillow_testing.overlay(background_path, paste)
         
         # set keypoint array
         keypoint_array[0] = center_x
@@ -111,8 +113,8 @@ class CocoKeypoints(torch.utils.data.Dataset):
             keypoint_array[2] = 0       # if paste is not true, no image is inserted
             
         # extract important information out of json file
-        image_id = ann['image_id']
-        annotation_id = ann['id']       # take unique annotation ID (this is unique over all images?)
+        #image_id = ann['image_id']
+        #annotation_id = ann['id']       # take unique annotation ID (this is unique over all images?)
         is_crowd = 0                    # single object
         annotations = []
      
