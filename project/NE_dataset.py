@@ -35,12 +35,101 @@ class CocoKeypoints(torch.utils.data.Dataset):
     Our dataset will take an optional argument transform so that any required processing can be applied on the sample. 
     
     input example:
-        root=args.train_image_dir,
-        annFile=args.train_annotations,
+        root=args.train_image_dir, ## or args.val_image_dir
+        annFile=args.train_annotations, ## or .val_
         preprocess=preprocess,
         image_transform=transforms.image_transform_train,
         target_transforms=target_transforms,
     """
+    def __init__(self, root, annFile, image_transform=None, target_transforms=None, preprocess=None, horzontalflip=None):
+        from pycocotools.coco import COCO
+        self.root = root
+        self.coco = COCO(annFile)
+        
+        # get all images - not filter
+        
+        self.cat_ids = self.coco.getCatIds()
+        self.ids = self.coco.getImgIds()
+        self.filter_for_box_annotations()
+        #self.ids = self.ids[:5]
+        
+        print('Images: {}'.format(len(self.ids)))
+
+        self.preprocess = preprocess or transforms.Normalize()
+        self.image_transform = image_transform or transforms.image_transform
+        self.target_transforms = target_transforms
+
+        self.log = logging.getLogger(self.__class__.__name__)
+    
+    def __getitem__(self,index):
+        """"Important variables:
+        image_info: created by coco.loadImgs(), It has 'file_name' dict to load our file
+        """
+        image_id = self.ids[index]
+        image_info = self.coco.loadImgs(image_id)[0]
+        self.log.debug(image_info)
+
+        # 50% no object algorithm
+        threshold = 50
+        rand_num = random.randint(0, 100)
+        if rand_num > threshold:
+            paste = True
+        else:
+            paste = False
+        anns, overlay_image = self.modify_keypoints(anns, image_info['file_name'], paste)
+        
+        image = overlay_image.convert('RGB')
+        #with open(os.path.join(self.root, image_info['file_name']), 'rb') as f:
+        #    image = Image.open(f).convert('RGB')
+        meta = {
+            'dataset_index': index,
+            'image_id': image_id,
+            'file_name': image_info['file_name'],
+        }
+        return image, targets, meta
+        
+    def __len__(self):
+        return len(self.ids)
+
+    def modify_keypoints(self, anns, filename, paste):
+        # in the end we just want to have one keypoint
+        # this keypoints is the center of our chosen tracking object
+        keypoint_array = [0.,0.,0.]
+       
+        #ann = anns[0]                   # image ID is the same all annotations of one image
+        
+        #background_path = IMAGE_DIR_TRAIN + str(filename)
+        object_path = "test_images/model.png"
+        image, center_x, center_y, x_pos, y_pos, length, height = PR_pillow_testing.overlay(background_path, object_path, paste)
+        
+        # set keypoint array
+        keypoint_array[0] = center_x
+        keypoint_array[1] = center_y
+        if (paste):
+            keypoint_array[2] = 2       # we always set the keypoint to visible 
+        else:
+            keypoint_array[2] = 0       # if paste is not true, no image is inserted
+            
+        # extract important information out of json file
+        image_id = ann['image_id']
+        annotation_id = ann['id']       # take unique annotation ID (this is unique over all images?)
+        is_crowd = 0                    # single object
+        annotations = []
+     
+        # create annotations
+        bbox = [x_pos, y_pos, length, height]
+        annotation_object = {
+            'segmentation': [],
+            'iscrowd': 0,
+            'image_id': 1,
+            'id': 1,
+            'bbox': bbox
+        }
+        annotation_object['keypoints'] = keypoint_array
+        annotations.append(annotation_object)
+        
+        return annotations, image
+
 
 def train_cli(parser):
     """A function I don't know.
