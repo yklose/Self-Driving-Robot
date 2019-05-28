@@ -1,12 +1,11 @@
-# pillow testing
-
-
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
+import os
+from torchvision.transforms import *
 import random
 
 
 
-def overlay_output(background_path, paste):
+def overlay(background_path, paste):
     """The function dose the following:
         1. Rescale the generated pattern and make it suit he img.
         2. Find a random axis to place the pattern.
@@ -19,6 +18,7 @@ def overlay_output(background_path, paste):
         Whatever suit the training input function.
         And a list indicating x, y, Width, Height
     """
+    img =  Image.open(background_path).convert("RGBA")
     n_of_patterns = 1
     scale = 0.3
     imgWidth ,imgHeight = img.size
@@ -28,7 +28,7 @@ def overlay_output(background_path, paste):
         random_fit_width = int(fitWidth * random.uniform(0.2,1.0))
         pattern = generate_pattern(random_fit_width)# generate_pattern() # pattern is also a PIL.image file
         patternWidth, patternHeight = pattern.size
-        pattern.save(os.path.join('transformed_pattern.png'))
+        # pattern.save(os.path.join('transformed_pattern.png'))
         position_x = random.randint(0,imgWidth - patternWidth)
         position_y = random.randint(0,imgHeight - patternHeight)
 
@@ -36,7 +36,8 @@ def overlay_output(background_path, paste):
             img.paste(pattern,box =(position_x,position_y),mask = pattern) 
         # the third argument serves as a mask, making white = 0 transparent
         # Axis.append ([position_x,position_y,position_x + patternWidth,position_y + patternHeight])
-        center_x = int(position_x + 0.5*patternWidth,position_y+0.5*patternHeight)
+        center_x = int(position_x + 0.5*patternWidth)
+        center_y = int(position_y+0.5*patternHeight)
 
     return img , center_x, center_y, position_x, position_y, patternWidth, patternHeight
 
@@ -47,7 +48,7 @@ def generate_pattern(random_fit_width):
         2. Do random transformation on it.
         3. Return a transformed PIL.image file
     """
-    pattern = Image.open('pattern.png').convert("RGBA")
+    pattern = Image.open("/home/zyi/project/pattern.png").convert("RGBA")
     patternWidth, patternHeight = pattern.size
     patternHeight = int(random_fit_width / patternWidth * patternHeight)
     patternWidth = random_fit_width

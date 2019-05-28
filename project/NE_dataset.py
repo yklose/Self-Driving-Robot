@@ -10,16 +10,16 @@ from openpifpaf import utils
 from openpifpaf.datasets import collate_images_targets_meta
 
 import PR_pillow_testing
-from skimage import measure                        
+# from skimage import measure                        
 # from shapely.geometry import Polygon, MultiPolygon 
 
 import numpy as np
 import random
 
-ANNOTATIONS_TRAIN = '~/data-mscoco/annotations/instances_train2017.json'
-ANNOTATIONS_VAL = '~/data-mscoco/annotations/instances_val2017.json'
-IMAGE_DIR_TRAIN = '~/data-mscoco/images/train2017/'
-IMAGE_DIR_VAL = '~/data-mscoco/images/val2017/'
+ANNOTATIONS_TRAIN = '/home/zyi/data-mscoco/annotations/instances_train2017.json'
+ANNOTATIONS_VAL = '/home/zyi/data-mscoco/annotations/instances_val2017.json'
+IMAGE_DIR_TRAIN = '/home/zyi/data-mscoco/images/train2017/'
+IMAGE_DIR_VAL = '/home/zyi/data-mscoco/images/val2017/'
 
 class CocoKeypoints(torch.utils.data.Dataset):
     """CocoKeypoints is a subclass of torch.utils.data.Dataset
@@ -81,6 +81,13 @@ class CocoKeypoints(torch.utils.data.Dataset):
         anns, overlay_image = self.modify_keypoints(anns, image_info['file_name'], paste)
         
         image = overlay_image.convert('RGB')
+
+        # transform image
+        original_size = image.size
+        image = self.image_transform(image)
+        assert image.size(2) == original_size[0]
+        assert image.size(1) == original_size[1]
+
         #with open(os.path.join(self.root, image_info['file_name']), 'rb') as f:
         #    image = Image.open(f).convert('RGB')
         meta = {
@@ -88,6 +95,14 @@ class CocoKeypoints(torch.utils.data.Dataset):
             'image_id': image_id,
             'file_name': image_info['file_name'],
         }
+
+        # if there are not target transforms, done here
+        self.log.debug(meta)
+        if self.target_transforms is None:
+            return image, anns, meta
+
+        # transform targets
+        targets = [t(anns, original_size) for t in self.target_transforms]
         return image, targets, meta
         
     def __len__(self):
