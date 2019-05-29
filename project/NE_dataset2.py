@@ -50,7 +50,7 @@ class CocoKeypoints(torch.utils.data.Dataset):
         #self.filter_for_box_annotations()
         #self.ids = self.ids[:5]
         
-        self.target_img = Image.open('patch.png', 'r').convert("RGB")
+        self.target_img = Image.open("/home/zyi/project/patch.png", 'r').convert("RGB")
         print('Images: {}'.format(len(self.ids)))
 
         self.preprocess = preprocess or transforms.Normalize()
