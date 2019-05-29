@@ -71,28 +71,15 @@ class CocoKeypoints(torch.utils.data.Dataset):
         with open(os.path.join(self.root, image_info['file_name']), 'rb') as f:
             image = Image.open(f).convert('RGB')
 
-        # transform image
-        original_size = image.size
-        image = self.image_transform(image)
-        assert image.size(2) == original_size[0]
-        assert image.size(1) == original_size[1]
-
-        meta = {
-            'dataset_index': index,
-            'image_id': image_id,
-            'file_name': image_info['file_name'],
-        }
         meta_init = {
             'dataset_index': index,
             'image_id': image_id,
             'file_name': image_info['file_name'],
         }
-
         if 'flickr_url' in image_info:
             _, flickr_file_name = image_info['flickr_url'].rsplit('/', maxsplit=1)
             flickr_id, _ = flickr_file_name.split('_', maxsplit=1)
             meta_init['flickr_full_page'] = 'http://flickr.com/photo.gne?id={}'.format(flickr_id)
-
 
         image, anns = paste_img(image, self.target_img, image_id)
 
@@ -119,8 +106,8 @@ class CocoKeypoints(torch.utils.data.Dataset):
         assert image.size(1) == original_size[1]
 
         # mask valid
-        valid_area = meta['valid_area']
-        utils.mask_valid_area(image, valid_area)
+        #valid_area = meta['valid_area']
+        #utils.mask_valid_area(image, valid_area)
 
         self.log.debug(meta)
 
