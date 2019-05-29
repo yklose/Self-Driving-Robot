@@ -6,7 +6,7 @@ import socket
 
 import torch
 
-import datasets_detection as datasets
+import NE_dataset as datasets
 from openpifpaf import encoder, logs, optimize, transforms
 from openpifpaf.network import losses, nets, Trainer
 from openpifpaf import __version__ as VERSION
