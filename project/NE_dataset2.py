@@ -175,7 +175,8 @@ def train_factory(args, preprocess, target_transforms):
     )
 
     val_loader = torch.utils.data.DataLoader(
-        val_data, batch_size=args.batch_size, shuffle=False,
+        torch.utils.data.Subset(val_data, np.random.choice(len(val_data),5000)),
+        batch_size=args.batch_size, shuffle=False,
         pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True,
         collate_fn=collate_images_targets_meta)
     
@@ -188,7 +189,8 @@ def train_factory(args, preprocess, target_transforms):
         
     )
     pre_train_loader = torch.utils.data.DataLoader(
-        pre_train_data, batch_size=args.batch_size, shuffle=True,
+        torch.utils.data.Subset(pre_train_data, np.random.choice(len(pre_train_data),20000)),
+        batch_size=args.batch_size, shuffle=True,
         pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True,
         collate_fn=collate_images_targets_meta)
 
