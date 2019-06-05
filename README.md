@@ -1,4 +1,4 @@
-# SelfDrivingRobot
+# Self Driving Robot (AI)
 By Yannick Paul Klose and Yi Zhiyuan <br>
 EPFL Project - Loomo Robot <br>
 Data and AI for Transportation Course
