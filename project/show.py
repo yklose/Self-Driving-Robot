@@ -1,3 +1,11 @@
+#########################################################################
+#                                                                       #
+#    Authors: Kreiss, Sven and Bertoni, Lorenzo and Alahi, Alexandre    #
+#    Year 2019                                                          #
+#                                                                       #
+#########################################################################
+
+
 from contextlib import contextmanager
 
 import numpy as np

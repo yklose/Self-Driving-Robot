@@ -1,3 +1,13 @@
+#########################################################################
+#                                                                       #
+#    Authors: Kreiss, Sven and Bertoni, Lorenzo and Alahi, Alexandre    #
+#    Year 2019                                                          #
+#                                                                       #
+#    Modified: Yannick Paul Klose                                       #
+#    (Object detection instead of Human Pose estimation)                #
+#########################################################################
+
+
 import copy
 import logging
 import os
@@ -16,24 +26,14 @@ from shapely.geometry import Polygon, MultiPolygon
 import numpy as np
 import random
 
-ANNOTATIONS_TRAIN = 'data-mscoco/annotations/instances_train2017.json'
-ANNOTATIONS_VAL = 'data-mscoco/annotations/instances_val2017.json'
-IMAGE_DIR_TRAIN = 'data-mscoco/images/train2017/'
-IMAGE_DIR_VAL = 'data-mscoco/images/val2017/'
 
-################################################################################
-# TODO:                                                                        #
-# - Create dataset class modeled after CocoKeypoints in the official           #
-#   OpenPifPaf repo                                                            #
-# - Modify to take all categories of COCO (CocoKeypoints uses only the human   #
-#   category)                                                                  #
-# - Using the bounding box and class labels, create a new ground-truth         #
-#   annotation that can be used for detection                                  #
-#   (using a single keypoint per class, being the center of the bounding box)  #
-#                                                                              #
-# Hint: Use the OpenPifPaf repo for reference                                  #
-#                                                                              #
-################################################################################
+# no need for training and validation set since the images are pasted randomly
+# images used in annotations train and val are just background images
+ANNOTATIONS_TRAIN = 'data-mscoco/annotations/instances_train2017.json'
+ANNOTATIONS_VAL = 'data-mscoco/annotations/instances_train2017.json'
+IMAGE_DIR_TRAIN = 'data-mscoco/images/train2017/'
+IMAGE_DIR_VAL = 'data-mscoco/images/train2017/'
+
 class CocoKeypoints(torch.utils.data.Dataset):
     
     def __init__(self, root, annFile, image_transform=None, target_transforms=None, preprocess=None, horzontalflip=None):
@@ -46,8 +46,7 @@ class CocoKeypoints(torch.utils.data.Dataset):
         self.cat_ids = self.coco.getCatIds()
         self.ids = self.coco.getImgIds()
         self.filter_for_box_annotations()
-        #self.ids = self.ids[:5]
-        
+
         print('Images: {}'.format(len(self.ids)))
 
         self.preprocess = preprocess or transforms.Normalize()
@@ -63,8 +62,6 @@ class CocoKeypoints(torch.utils.data.Dataset):
         anns = self.coco.loadAnns(ann_ids)
         anns = copy.deepcopy(anns)
 
-
-        #pdb.set_trace()
         image_info = self.coco.loadImgs(image_id)[0]
         self.log.debug(image_info)
         
@@ -75,11 +72,12 @@ class CocoKeypoints(torch.utils.data.Dataset):
             paste = True
         else:
             paste = False
-        anns, overlay_image = self.modify_keypoints(anns, image_info['file_name'], paste)
+            
+            
+        # just for after training on special dataset 
+        after_training = False
+        anns, overlay_image = self.modify_keypoints(anns, image_info['file_name'], paste, after_training)
        
-        #with open(os.path.join(self.root, image_info['file_name']), 'rb') as f:
-        #    image = Image.open(f).convert('RGB')
-
         image = overlay_image.convert('RGB')
 
         meta = {
@@ -121,29 +119,39 @@ class CocoKeypoints(torch.utils.data.Dataset):
         return len(self.ids)
     
 
-    def modify_keypoints(self, anns, filename, paste):
+    def modify_keypoints(self, anns, filename, paste, after_training):
         # in the end we just want to have one keypoint
         # this keypoints is the center of our chosen tracking object
         keypoint_array = [0]*(3)
+
        
-        ann = anns[0]                   # image ID is the same all annotations of one image
+        # image ID is the same all annotations of one image
+        ann = anns[0]                   
         
         background_path = IMAGE_DIR_TRAIN + str(filename)
-        object_path = "test_images/model.png"
-        image, center_x, center_y, x_pos, y_pos, length, height = PR_pillow_testing.overlay(background_path, object_path, paste)
+        object_path = "tracked_pattern/model2.png"
+        
+        if after_training:
+            # background path will be overwritten!
+            image, center_x, center_y, x_pos, y_pos, length, height = PR_pillow_testing.overlay(background_path, object_path, paste, True)
+        else: 
+            # take coco dataset for training!
+            image, center_x, center_y, x_pos, y_pos, length, height = PR_pillow_testing.overlay(background_path, object_path, paste, False)
         
         # set keypoint array
         keypoint_array[0] = center_x
         keypoint_array[1] = center_y
         if (paste):
-            keypoint_array[2] = 2       # we always set the keypoint to visible 
+            # we always set the keypoint to visible 
+            keypoint_array[2] = 2       
         else:
-            keypoint_array[2] = 0       # if paste is not true, no image is inserted
+            # if paste is not true, no image is inserted
+            keypoint_array[2] = 0       
             
         # extract important information out of json file
         image_id = ann['image_id']
-        annotation_id = ann['id']       # take unique annotation ID (this is unique over all images?)
-        is_crowd = 0                    # single object
+        annotation_id = ann['id']      
+        is_crowd = 0                    
         annotations = []
      
         # create annotations
@@ -208,12 +216,7 @@ def train_cli(parser):
 
 
 def train_factory(args, preprocess, target_transforms):
-    ################################################################################
-    # TODO:                                                                        #
-    # Implement the dataset loaders and datasets                                   #
-    #                                                                              #
-    # Hint: Use the OpenPifPaf repo for reference (especially datasets.py)         #
-    ################################################################################
+    
     train_data = CocoKeypoints(
         root=args.train_image_dir,
         annFile=args.train_annotations,
@@ -224,15 +227,22 @@ def train_factory(args, preprocess, target_transforms):
     )
     
     np.random.seed(100)
-
-    train_loader = torch.utils.data.DataLoader(torch.utils.data.Subset(train_data, np.random.choice(len(train_data),20000)), batch_size=args.batch_size, shuffle=not args.debug, pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True, collate_fn=collate_images_targets_meta)
     
     
-    """train_loader = torch.utils.data.DataLoader(
-        train_data, batch_size=args.batch_size, shuffle=not args.debug,
-        pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True,
-        collate_fn=collate_images_targets_meta)"""
+    # select if model should be finetuned or not!
+    after_training = False
+    if after_training:
+        num_train_images = 1000
+        num_val_images = 100
+        num_pretrain_images = 100
+    else:
+        num_train_images = 40000
+        num_val_images = 1000
+        num_pretrain_images = 1000
+        
 
+    train_loader = torch.utils.data.DataLoader(torch.utils.data.Subset(train_data, np.random.choice(len(train_data),num_train_images)), batch_size=args.batch_size, shuffle=not args.debug, pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True, collate_fn=collate_images_targets_meta)
+    
     val_data = CocoKeypoints(
         root=args.val_image_dir,
         annFile=args.val_annotations,
@@ -242,10 +252,9 @@ def train_factory(args, preprocess, target_transforms):
         
         
     )
-    val_loader = torch.utils.data.DataLoader(
-        val_data, batch_size=args.batch_size, shuffle=False,
-        pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True,
-        collate_fn=collate_images_targets_meta)
+    
+    val_loader = torch.utils.data.DataLoader(torch.utils.data.Subset(val_data, np.random.choice(len(val_data),num_val_images)), batch_size=args.batch_size, shuffle=not args.debug, pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True, collate_fn=collate_images_targets_meta)
+    
 
     pre_train_data = CocoKeypoints(
         root=args.train_image_dir,
@@ -257,15 +266,7 @@ def train_factory(args, preprocess, target_transforms):
         
     )
     
-    pre_train_loader = torch.utils.data.DataLoader(torch.utils.data.Subset(train_data, np.random.choice(len(train_data),1000)), batch_size=args.batch_size, shuffle=not args.debug, pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True, collate_fn=collate_images_targets_meta)
+    pre_train_loader = torch.utils.data.DataLoader(torch.utils.data.Subset(train_data, np.random.choice(len(train_data),num_pretrain_images)), batch_size=args.batch_size, shuffle=not args.debug, pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True, collate_fn=collate_images_targets_meta)
     
-    """pre_train_loader = torch.utils.data.DataLoader(
-        pre_train_data, batch_size=args.batch_size, shuffle=True,
-        pin_memory=args.pin_memory, num_workers=args.loader_workers, drop_last=True,
-        collate_fn=collate_images_targets_meta)"""
-    
-    ################################################################################
-    #                              END OF YOUR CODE                                #
-    ################################################################################
 
     return train_loader, val_loader, pre_train_loader

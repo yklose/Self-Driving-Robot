@@ -1,4 +1,10 @@
-"""Train a pifpaf network."""
+#########################################################################
+#                                                                       #
+#    Authors: Kreiss, Sven and Bertoni, Lorenzo and Alahi, Alexandre    #
+#    Year 2019                                                          #
+#                                                                       #
+#########################################################################
+
 
 import argparse
 import datetime
